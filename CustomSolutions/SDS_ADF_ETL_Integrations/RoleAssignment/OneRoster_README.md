@@ -49,9 +49,9 @@ The Azure resources for this solution consist of the following:
 | -------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | rg-OneRosterAPItoSDS | Resource group    | Serves as a container for the resources in this solution                                                                                                                                                          |
 | adf-OneRostertoSDS   | Data Factory (V2) | The data factory instance, containing the scheduled integration pipelines.                                           |
-| kv-oneroster-sds     | Key vault         | Contains 2 keys: <br/>1) ClientSecretForSdsApiKeyVaultUrl— The client secret created via the App Registration for the ADF instance (details further down) <br/>2) ORClientSecret– The OneRoster API client secret                                                                           |
+| kv-oneroster-sds     | Key vault         | Contains 2 keys: <br/>1) ClientSecretForSdsApiKeyVaultUrl— The client secret created via the App Registration for the ADF instance (details further down) <br/>2) ORClientSecret– The OneRoster API client secret |
 | stonerostersds       | Storage account   | V2 storage account, Read-access geo-redundant storage, Encryption type: Microsoft-managed keys                       |
-| onerosterimportcsvs  | Blob storage      | The container where the Oneroster import files reside.  SFTP can be enabled on the storage account if transferring source files from outside the Azure tenant. (Note: The name is a suggestion and can be any name.)                                                                               |
+| onerosterimportcsvs  | Blob storage      | The container where the Oneroster import files reside.  SFTP can be enabled on the storage account if transferring source files from outside the Azure tenant. (Note: The name is a suggestion and can be any name.) |
 | resources            | Blob storage      | The container which has files used by this ADF solution.                                                              |
 
 The setup within the Azure
