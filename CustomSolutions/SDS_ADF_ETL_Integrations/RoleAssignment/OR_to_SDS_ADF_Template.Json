@@ -10,6 +10,11 @@
             "defaultValue": "stonerostersds",
             "type": "String"
         },
+        "blobContainer_orimportcsvs_name": {
+            "defaultValue": "orimportcsvs",
+            "metadata": "Blob container for OR CSVs",
+            "type": "String"
+        },
         "IMSOneRosterValidator_properties_typeProperties_url": {
             "type": "string",
             "defaultValue": ""
@@ -135,10 +140,14 @@
         "Keyvault_properties_privateLinkResourceId":"[concat('/subscriptions/',subscription().subscriptionId,'/resourceGroups/',resourceGroup().name,'/providers/Microsoft.KeyVault/vaults/',parameters('Keyvault name'))]",
         "Keyvault_properties_groupId":"vault",
         "Keyvault_properties_fqdns":"[concat(parameters('Keyvault name'),'.vault.azure.net')]",
+        "kv-adf_roleAssignmentId":"[guid(concat(resourceGroup().id, 'Key Vault Secrets User'))]",
         "StorageAccount_properties_privateLinkResourceId":"[concat('/subscriptions/',subscription().subscriptionId,'/resourceGroups/',resourceGroup().name,'/providers/Microsoft.Storage/storageAccounts/',parameters('Storage account name'))]",
         "StorageAccount_properties_groupId":"dfs",
         "StorageAccount_properties_fqdns":"[concat(parameters('Storage account name'),'.dfs.core.windows.net')]",
-        "factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('Data Factory Name'))]"
+        "factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('Data Factory Name'))]",
+        "st-adf_roleAssignmentId":"[guid(concat(resourceGroup().id, 'Storage Blob Data Contributor'))]",
+        "factoryName": "[parameters('Data Factory Name')]",
+        "stName": "[parameters('Storage account name')]"
     },
     "resources": [
         {
@@ -162,7 +171,7 @@
                 "enabledForDeployment": false,
                 "enabledForDiskEncryption": false,
                 "enabledForTemplateDeployment": false,
-                "enableSoftDelete": true,
+                "enableSoftDelete": false,
                 "softDeleteRetentionInDays": 90,
                 "enableRbacAuthorization": false,
                 "vaultUri": "[variables('Keyvault integration_properties_typeProperties_baseUrl')]",
@@ -244,6 +253,36 @@
                 },
                 "value": "blank"
             }
+        },
+        {
+            "type": "Microsoft.Authorization/roleAssignments",
+            "apiVersion": "2022-04-01",
+            "name": "[variables('st-adf_roleAssignmentId')]",
+            "scope": "[concat('Microsoft.Storage/storageAccounts', '/', parameters('Storage account name'))]",
+            "properties": {
+                "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/ba92f5b4-2d11-453d-a403-e96b0029c9fe')]",
+                "principalId": "[reference(concat('Microsoft.DataFactory/factories', '/', parameters('Data Factory Name')), '2018-06-01', 'Full').identity.principalId]",
+                "principalType": "ServicePrincipal"
+            },
+            "dependsOn": [
+                  "[resourceId('Microsoft.Storage/storageAccounts', parameters('Storage account name'))]",
+                  "[resourceId('Microsoft.DataFactory/factories', parameters('Data Factory Name'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Authorization/roleAssignments",
+            "apiVersion": "2022-04-01",
+            "name": "[variables('kv-adf_roleAssignmentId')]",
+            "scope": "[concat('Microsoft.KeyVault/vaults', '/', parameters('Keyvault name'))]",
+            "properties": {
+                "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/4633458b-17de-408a-b874-0445c86b69e6')]",
+                "principalId": "[reference(concat('Microsoft.DataFactory/factories', '/', parameters('Data Factory Name')), '2018-06-01', 'Full').identity.principalId]",
+                "principalType": "ServicePrincipal"
+            },
+            "dependsOn": [
+                  "[resourceId('Microsoft.KeyVault/vaults', parameters('Keyvault name'))]",
+                  "[resourceId('Microsoft.DataFactory/factories', parameters('Data Factory Name'))]"
+            ]
         },
         {
             "type": "Microsoft.Storage/storageAccounts/blobServices",
@@ -4039,7 +4078,7 @@
                             }
                         ],
                         "policy": {
-                            "timeout": "7.00:00:00",
+                            "timeout": "0.00:10:00",
                             "retry": 0,
                             "retryIntervalInSeconds": 30,
                             "secureOutput": true,
@@ -4102,7 +4141,7 @@
                             }
                         ],
                         "policy": {
-                            "timeout": "7.00:00:00",
+                            "timeout": "0.00:10:00",
                             "retry": 0,
                             "retryIntervalInSeconds": 30,
                             "secureOutput": true,
@@ -4182,7 +4221,7 @@
                         ]
                     },
                     {
-                        "name": "VerifyUploadAndStartSync",
+                        "name": "VerifyUpload",
                         "type": "WebActivity",
                         "dependsOn": [
                             {
@@ -4193,7 +4232,7 @@
                             }
                         ],
                         "policy": {
-                            "timeout": "7.00:00:00",
+                            "timeout": "0.00:10:00",
                             "retry": 0,
                             "retryIntervalInSeconds": 30,
                             "secureOutput": false,
@@ -4225,7 +4264,7 @@
                         "type": "WebActivity",
                         "dependsOn": [],
                         "policy": {
-                            "timeout": "7.00:00:00",
+                            "timeout": "0.00:10:00",
                             "retry": 0,
                             "retryIntervalInSeconds": 30,
                             "secureOutput": true,
@@ -4261,7 +4300,7 @@
                             }
                         ],
                         "policy": {
-                            "timeout": "7.00:00:00",
+                            "timeout": "0.00:10:00",
                             "retry": 0,
                             "retryIntervalInSeconds": 30,
                             "secureOutput": false,
@@ -4363,7 +4402,7 @@
                         "type": "Until",
                         "dependsOn": [
                             {
-                                "activity": "VerifyUploadAndStartSync",
+                                "activity": "VerifyUpload",
                                 "dependencyConditions": [
                                     "Succeeded"
                                 ]
@@ -4398,7 +4437,7 @@
                                         },
                                         "turnOffAsync": false,
                                         "url": {
-                                            "value": "@activity('VerifyUploadAndStartSync').output.ADFWebActivityResponseHeaders.location",
+                                            "value": "@activity('VerifyUpload').output.ADFWebActivityResponseHeaders.location",
                                             "type": "Expression"
                                         },
                                         "connectVia": {
@@ -4807,7 +4846,7 @@
                                     }
                                 }
                             ],
-                            "timeout": "0.00:10:00"
+                            "timeout": "0.00:03:00"
                         }
                     }
                 ],
@@ -5446,7 +5485,7 @@
                                     "type": "ExecuteDataFlow",
                                     "dependsOn": [],
                                     "policy": {
-                                        "timeout": "0.00:10:00",
+                                        "timeout": "0.12:00:00",
                                         "retry": 0,
                                         "retryIntervalInSeconds": 30,
                                         "secureOutput": false,
@@ -5521,7 +5560,7 @@
                                     "type": "ExecuteDataFlow",
                                     "dependsOn": [],
                                     "policy": {
-                                        "timeout": "0.00:10:00",
+                                        "timeout": "0.12:00:00",
                                         "retry": 0,
                                         "retryIntervalInSeconds": 30,
                                         "secureOutput": false,
@@ -5615,7 +5654,7 @@
                                     "type": "ExecuteDataFlow",
                                     "dependsOn": [],
                                     "policy": {
-                                        "timeout": "0.00:10:00",
+                                        "timeout": "0.12:00:00",
                                         "retry": 0,
                                         "retryIntervalInSeconds": 30,
                                         "secureOutput": false,
@@ -6342,7 +6381,7 @@
                                         }
                                     ],
                                     "policy": {
-                                        "timeout": "0.00:10:00",
+                                        "timeout": "0.12:00:00",
                                         "retry": 0,
                                         "retryIntervalInSeconds": 30,
                                         "secureOutput": false,
@@ -6526,7 +6565,7 @@
                                         }
                                     ],
                                     "policy": {
-                                        "timeout": "0.00:10:00",
+                                        "timeout": "0.12:00:00",
                                         "retry": 0,
                                         "retryIntervalInSeconds": 30,
                                         "secureOutput": false,
@@ -6572,7 +6611,7 @@
                                         }
                                     ],
                                     "policy": {
-                                        "timeout": "0.00:10:00",
+                                        "timeout": "0.12:00:00",
                                         "retry": 0,
                                         "retryIntervalInSeconds": 30,
                                         "secureOutput": false,
@@ -6800,7 +6839,7 @@
                             }
                         ],
                         "policy": {
-                            "timeout": "0.00:10:00",
+                            "timeout": "0.12:00:00",
                             "retry": 0,
                             "retryIntervalInSeconds": 30,
                             "secureOutput": false,
@@ -6866,7 +6905,7 @@
                                     "type": "ExecuteDataFlow",
                                     "dependsOn": [],
                                     "policy": {
-                                        "timeout": "0.00:10:00",
+                                        "timeout": "0.12:00:00",
                                         "retry": 0,
                                         "retryIntervalInSeconds": 30,
                                         "secureOutput": false,
@@ -6916,7 +6955,7 @@
                                     "type": "ExecuteDataFlow",
                                     "dependsOn": [],
                                     "policy": {
-                                        "timeout": "0.00:10:00",
+                                        "timeout": "0.12:00:00",
                                         "retry": 0,
                                         "retryIntervalInSeconds": 30,
                                         "secureOutput": false,
@@ -7014,7 +7053,7 @@
                         "type": "Delete",
                         "dependsOn": [],
                         "policy": {
-                            "timeout": "0.00:10:00",
+                            "timeout": "0.12:00:00",
                             "retry": 0,
                             "retryIntervalInSeconds": 30,
                             "secureOutput": false,
@@ -7094,7 +7133,7 @@
                             }
                         ],
                         "policy": {
-                            "timeout": "0.00:10:00",
+                            "timeout": "0.12:00:00",
                             "retry": 0,
                             "retryIntervalInSeconds": 30,
                             "secureOutput": false,
@@ -7154,7 +7193,7 @@
                             }
                         ],
                         "policy": {
-                            "timeout": "0.00:10:00",
+                            "timeout": "0.12:00:00",
                             "retry": 0,
                             "retryIntervalInSeconds": 30,
                             "secureOutput": false,
@@ -7201,7 +7240,7 @@
                             }
                         ],
                         "policy": {
-                            "timeout": "0.00:10:00",
+                            "timeout": "0.12:00:00",
                             "retry": 0,
                             "retryIntervalInSeconds": 30,
                             "secureOutput": false,
@@ -7249,7 +7288,7 @@
                         "type": "ExecuteDataFlow",
                         "dependsOn": [],
                         "policy": {
-                            "timeout": "0.00:10:00",
+                            "timeout": "0.12:00:00",
                             "retry": 0,
                             "retryIntervalInSeconds": 30,
                             "secureOutput": false,
@@ -7304,7 +7343,7 @@
                             }
                         ],
                         "policy": {
-                            "timeout": "0.00:10:00",
+                            "timeout": "0.12:00:00",
                             "retry": 0,
                             "retryIntervalInSeconds": 30,
                             "secureOutput": false,
@@ -7363,7 +7402,7 @@
                                     "type": "ExecuteDataFlow",
                                     "dependsOn": [],
                                     "policy": {
-                                        "timeout": "0.00:10:00",
+                                        "timeout": "0.12:00:00",
                                         "retry": 0,
                                         "retryIntervalInSeconds": 30,
                                         "secureOutput": false,
@@ -7409,7 +7448,7 @@
                             }
                         ],
                         "policy": {
-                            "timeout": "0.00:10:00",
+                            "timeout": "0.12:00:00",
                             "retry": 0,
                             "retryIntervalInSeconds": 30,
                             "secureOutput": false,
@@ -7474,7 +7513,7 @@
                             }
                         ],
                         "policy": {
-                            "timeout": "0.00:10:00",
+                            "timeout": "0.12:00:00",
                             "retry": 0,
                             "retryIntervalInSeconds": 30,
                             "secureOutput": false,
@@ -7609,6 +7648,22 @@
             ]
         },
         {
+            "type": "Microsoft.KeyVault/vaults/privateEndpointConnections",
+            "apiVersion": "2024-11-01",
+            "name": "[concat(parameters('Keyvault name') ,'/', parameters('Data Factory Name') ,'.', parameters('Keyvault name'), '-conn')]",
+            "properties": {
+                "privateEndpoint": {},
+                "privateLinkServiceConnectionState": {
+                    "status": "Approved",
+                    "description": "ARM - AutoApproved",
+                    "actionRequired": "None"
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints', parameters('Data Factory Name'), 'default', parameters('Keyvault name'))]"
+            ]
+        },
+        {
             "name": "[concat(parameters('Data Factory Name'), '/default/',parameters('Storage account name'))]",
             "type": "Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints",
             "apiVersion": "2018-06-01",
@@ -7621,6 +7676,55 @@
                 "[concat(variables('factoryId'), '/managedVirtualNetworks/default')]",
                 "[resourceId('Microsoft.DataFactory/factories', parameters('Data Factory Name'))]"
             ]
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2019-10-01",
+            "name": "[concat(deployment().name, '_ADF_MPE_ST_Approve')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints', parameters('Data Factory Name'), 'default', parameters('Storage account name'))]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "expressionEvaluationOptions": {
+                    "scope": "inner"
+                },
+                "parameters": {
+                    "ST-MPEs-ToApprove": {
+                        "value": "[filter(reference(resourceId('Microsoft.Storage/storageAccounts', parameters('Storage account name')), '2023-04-01').privateEndpointConnections, lambda('pe', not(equals(lambdaVariables('pe').properties.privateLinkServiceConnectionState.status, 'Approved'))))]"
+                    }
+                   
+                },
+                "template": {
+                    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "ST-MPEs-ToApprove": {
+                            "type": "array"
+                        }
+                       
+                    },
+                    "resources": [
+                        {
+                            "copy": {
+                                "name": "Copy_ST-PE-Approval",
+                                "count": "[length(parameters('ST-MPEs-ToApprove'))]"
+                            },
+                            "type": "Microsoft.Storage/storageAccounts/privateEndpointConnections",
+                            "apiVersion": "2023-05-01",
+                            "name": "[concat(parameters('Storage account name') ,'/', parameters('ST-MPEs-ToApprove')[copyIndex('Copy_ST-PE-Approval')].name)]",
+                            "properties": {
+                                "privateEndpoint": {},
+                                "privateLinkServiceConnectionState": {
+                                    "status": "Approved",
+                                    "description": "ARM - AutoApproved",
+                                    "actionRequired": "None"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
         },
         {
             "name": "[parameters('Data Factory Name')]",
