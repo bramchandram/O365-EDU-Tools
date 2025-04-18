@@ -171,7 +171,7 @@
                 "enabledForDeployment": false,
                 "enabledForDiskEncryption": false,
                 "enabledForTemplateDeployment": false,
-                "enableSoftDelete": false,
+                "enableSoftDelete": true,
                 "softDeleteRetentionInDays": 90,
                 "enableRbacAuthorization": false,
                 "vaultUri": "[variables('Keyvault integration_properties_typeProperties_baseUrl')]",
